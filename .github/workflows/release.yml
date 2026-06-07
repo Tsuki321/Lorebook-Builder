@@ -41,16 +41,8 @@ jobs:
           rustc --version
           cargo --version
 
-      - name: Generate Cargo.lock if missing
-        shell: pwsh
-        run: |
-          if (-not (Test-Path Cargo.lock)) {
-            Write-Host "Cargo.lock not found, generating via cargo update..."
-            cargo update --workspace
-          }
-
       - name: Build release binary
-        run: cargo build --release --target x86_64-pc-windows-msvc
+        run: cargo build --release --locked --target x86_64-pc-windows-msvc
 
       - name: Strip and rename
         shell: pwsh
@@ -61,14 +53,6 @@ jobs:
           strip "$src"
           Move-Item -Force "$src" "$dst"
           Get-Item $dst | Format-Table Name, Length
-
-      - name: Upload Cargo.lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: cargo-lock
-          path: Cargo.lock
-          if-no-files-found: warn
-          retention-days: 7
 
       - name: Upload .exe artifact
         uses: actions/upload-artifact@v4
@@ -93,17 +77,9 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "."
-      - name: Generate Cargo.lock if missing
-        shell: pwsh
-        run: |
-          if (-not (Test-Path Cargo.lock)) {
-            Write-Host "Cargo.lock not found, generating via cargo update..."
-            cargo update --workspace
-          }
-
       - name: Build with LTO
         run: |
-          cargo build --release --target x86_64-pc-windows-msvc
+          cargo build --release --locked --target x86_64-pc-windows-msvc
       - name: Strip and rename
         shell: pwsh
         run: |
@@ -111,13 +87,6 @@ jobs:
           $dst = "wiki-lore-crawler-small-${{ github.sha }}.exe"
           strip "$src"
           Move-Item -Force "$src" "$dst"
-      - name: Upload Cargo.lock (small)
-        uses: actions/upload-artifact@v4
-        with:
-          name: cargo-lock-small
-          path: Cargo.lock
-          if-no-files-found: warn
-          retention-days: 7
       - name: Upload small artifact
         uses: actions/upload-artifact@v4
         with:
