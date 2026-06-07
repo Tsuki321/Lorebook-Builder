@@ -149,7 +149,7 @@ pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store) {
             "ETA: --".into()
         };
         ui.label(format!(
-            "✅ {} fetched   💾 {} cached   ❌ errors   📚 {} entries   ⏱ {}   {}",
+            "✅ {} fetched   💾 {} cached   ❌ {} errors   📚 {} entries   ⏱ {}   {}",
             state.ok, state.cached, state.err, state.entries_built, format_duration(elapsed), eta,
         ));
     }
