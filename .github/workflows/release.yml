@@ -62,6 +62,14 @@ jobs:
           Move-Item -Force "$src" "$dst"
           Get-Item $dst | Format-Table Name, Length
 
+      - name: Upload Cargo.lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lock
+          path: Cargo.lock
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload .exe artifact
         uses: actions/upload-artifact@v4
         with:
@@ -103,6 +111,13 @@ jobs:
           $dst = "wiki-lore-crawler-small-${{ github.sha }}.exe"
           strip "$src"
           Move-Item -Force "$src" "$dst"
+      - name: Upload Cargo.lock (small)
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lock-small
+          path: Cargo.lock
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload small artifact
         uses: actions/upload-artifact@v4
         with:
