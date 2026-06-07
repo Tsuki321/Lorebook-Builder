@@ -1,0 +1,30 @@
+# Rust
+/target
+**/*.rs.bk
+Cargo.lock.bak
+
+# Build artifacts
+*.pdb
+*.exe
+*.dll
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# App runtime data (created by the app)
+/lorebook.sqlite
+/cache/
+/exports/
+
+# Logs
+*.log
+
+# GitHub Actions
+/.github/local/

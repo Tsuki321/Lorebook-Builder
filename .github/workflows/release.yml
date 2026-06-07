@@ -1,0 +1,96 @@
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Cargo build profile"
+        type: choice
+        required: false
+        default: release
+        options:
+          - release
+          - release-small
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_NET_RETRY: 10
+
+jobs:
+  build-windows:
+    name: Build Windows .exe
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+          cache-on-failure: true
+
+      - name: Show toolchain info
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Build release binary
+        run: cargo build --release --locked --target x86_64-pc-windows-msvc
+
+      - name: Strip and rename
+        shell: pwsh
+        run: |
+          $src = "target/x86_64-pc-windows-msvc/release/wiki-lore-crawler.exe"
+          $dst = "wiki-lore-crawler-${{ github.sha }}.exe"
+          Write-Host "Stripping $src"
+          strip "$src"
+          Move-Item -Force "$src" "$dst"
+          Get-Item $dst | Format-Table Name, Length
+
+      - name: Upload .exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiki-lore-crawler-windows
+          path: wiki-lore-crawler-*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  build-windows-small:
+    name: Build Windows .exe (smaller, LTO)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+      - name: Build with LTO
+        run: |
+          cargo build --release --locked --target x86_64-pc-windows-msvc
+      - name: Strip and rename
+        shell: pwsh
+        run: |
+          $src = "target/x86_64-pc-windows-msvc/release/wiki-lore-crawler.exe"
+          $dst = "wiki-lore-crawler-small-${{ github.sha }}.exe"
+          strip "$src"
+          Move-Item -Force "$src" "$dst"
+      - name: Upload small artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiki-lore-crawler-windows-small
+          path: wiki-lore-crawler-small-*.exe
+          if-no-files-found: error
+          retention-days: 14

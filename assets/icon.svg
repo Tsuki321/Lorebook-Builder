@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="cover" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#89b4fa"/>
+      <stop offset="1" stop-color="#cba6f7"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cdd6f4"/>
+      <stop offset="1" stop-color="#a6adc8"/>
+    </linearGradient>
+    <linearGradient id="spine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#74c7ec"/>
+      <stop offset="1" stop-color="#b4befe"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="256" height="256" rx="48" fill="#1e1e2e"/>
+
+  <path d="M 40 76 L 40 220 Q 40 232 52 232 L 124 232 L 124 76 Q 124 70 118 67 Q 80 50 52 64 Q 40 70 40 76 Z"
+        fill="url(#cover)" stroke="#11111b" stroke-width="2.5"/>
+  <path d="M 216 76 L 216 220 Q 216 232 204 232 L 132 232 L 132 76 Q 132 70 138 67 Q 176 50 204 64 Q 216 70 216 76 Z"
+        fill="url(#spine)" stroke="#11111b" stroke-width="2.5"/>
+
+  <path d="M 50 90 L 118 96 L 118 208 L 50 202 Z" fill="url(#page)" stroke="#11111b" stroke-width="1.5"/>
+  <path d="M 138 96 L 206 90 L 206 202 L 138 208 Z" fill="url(#page)" stroke="#11111b" stroke-width="1.5"/>
+
+  <line x1="60" y1="118" x2="108" y2="120" stroke="#585b70" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="60" y1="134" x2="100" y2="136" stroke="#585b70" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="60" y1="150" x2="108" y2="152" stroke="#585b70" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="60" y1="166" x2="92" y2="168" stroke="#585b70" stroke-width="2.5" stroke-linecap="round"/>
+
+  <line x1="148" y1="120" x2="196" y2="118" stroke="#585b70" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="148" y1="136" x2="190" y2="134" stroke="#585b70" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="148" y1="152" x2="196" y2="150" stroke="#585b70" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="148" y1="168" x2="180" y2="166" stroke="#585b70" stroke-width="2.5" stroke-linecap="round"/>
+
+  <text x="82" y="200" font-family="Georgia, serif" font-size="36" font-weight="bold" fill="#45475a" text-anchor="middle">L</text>
+
+  <g transform="translate(200, 56)">
+    <path d="M 0 -16 L 4 -4 L 16 0 L 4 4 L 0 16 L -4 4 L -16 0 L -4 -4 Z" fill="#f9e2af"/>
+    <circle cx="0" cy="0" r="3" fill="#fffac2"/>
+  </g>
+  <g transform="translate(56, 48)">
+    <path d="M 0 -8 L 2 -2 L 8 0 L 2 2 L 0 8 L -2 2 L -8 0 L -2 -2 Z" fill="#f5c2e7"/>
+  </g>
+  <g transform="translate(228, 140)">
+    <path d="M 0 -5 L 1.2 -1.2 L 5 0 L 1.2 1.2 L 0 5 L -1.2 1.2 L -5 0 L -1.2 -1.2 Z" fill="#a6e3a1"/>
+  </g>
+</svg>

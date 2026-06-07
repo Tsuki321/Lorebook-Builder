@@ -1,0 +1,64 @@
+[package]
+name = "wiki-lore-crawler"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.78"
+description = "Crawl Fandom/MediaWiki wikis and build SillyTavern world info lorebooks"
+license = "MIT"
+repository = "https://github.com/anomalyco/lorebook-builder"
+readme = "README.md"
+keywords = ["wiki", "crawler", "sillytavern", "fandom", "lorebook"]
+categories = ["command-line-utilities", "web", "database"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
+[profile.release-small]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
+
+[dependencies]
+# GUI
+eframe = "0.32.3"
+egui = "0.32"
+catppuccin-egui = { version = "5.7", default-features = false, features = ["egui32"] }
+
+# Async + HTTP
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip"] }
+
+# Rate limiting
+governor = "0.7"
+
+# Storage
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# File dialogs
+rfd = "0.15"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Errors
+anyhow = "1"
+
+# Misc
+once_cell = "1"
+parking_lot = "0.12"
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+percent-encoding = "2"
+directories = "5"
