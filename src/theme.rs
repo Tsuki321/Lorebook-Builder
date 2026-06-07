@@ -26,6 +26,25 @@ impl ThemeChoice {
     pub fn is_dark(self) -> bool {
         !matches!(self, ThemeChoice::Latte)
     }
+
+    pub fn as_key(self) -> &'static str {
+        match self {
+            ThemeChoice::Mocha => "Mocha",
+            ThemeChoice::Macchiato => "Macchiato",
+            ThemeChoice::Frappe => "Frappe",
+            ThemeChoice::Latte => "Latte",
+        }
+    }
+
+    pub fn from_key(s: &str) -> Option<Self> {
+        match s {
+            "Mocha" => Some(ThemeChoice::Mocha),
+            "Macchiato" => Some(ThemeChoice::Macchiato),
+            "Frappe" | "Frappé" => Some(ThemeChoice::Frappe),
+            "Latte" => Some(ThemeChoice::Latte),
+            _ => None,
+        }
+    }
 }
 
 /// Apply a Catppuccin palette and our custom polish layer.

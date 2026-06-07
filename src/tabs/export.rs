@@ -43,7 +43,7 @@ impl ExportState {
     }
 }
 
-pub fn draw(ui: &mut Ui, state: &mut ExportState, store: &Store, toasts: &mut ToastQueue) {
+pub fn draw(ui: &mut Ui, state: &mut ExportState, store: &Store, toasts: &mut ToastQueue, dirty: &mut bool) {
     widgets::section_header(
         ui,
         "Export",
@@ -62,6 +62,7 @@ pub fn draw(ui: &mut Ui, state: &mut ExportState, store: &Store, toasts: &mut To
             let trimmed = path_str.trim();
             if !trimmed.is_empty() {
                 state.output_path = PathBuf::from(trimmed);
+                *dirty = true;
             }
         }
         if ui.button("📁  Browse…").on_hover_text("Pick a save location").clicked() {
@@ -70,6 +71,7 @@ pub fn draw(ui: &mut Ui, state: &mut ExportState, store: &Store, toasts: &mut To
                 .set_file_name(state.output_path.file_name().and_then(|s| s.to_str()).unwrap_or("lorebook.json"))
                 .save_file() {
                 state.output_path = p;
+                *dirty = true;
             }
         }
     });

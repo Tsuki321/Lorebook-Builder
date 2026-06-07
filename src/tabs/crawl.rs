@@ -40,7 +40,7 @@ pub struct CategoryToggle {
 
 impl CrawlState {
     pub fn new() -> Self {
-        let mut s = Self {
+        Self {
             wiki_url: "lordofthemysteries.fandom.com".into(),
             req_per_sec: 2,
             include_subpages: false,
@@ -57,17 +57,7 @@ impl CrawlState {
             running: false,
             log: Vec::new(),
             ..Default::default()
-        };
-        if let Some(pd) = ProjectDirs::from("com", "LorebookBuilder", "LorebookBuilder") {
-            let p = pd.config_dir().join("last_wiki.txt");
-            if let Ok(saved) = std::fs::read_to_string(&p) {
-                let trimmed = saved.trim();
-                if !trimmed.is_empty() {
-                    s.wiki_url = trimmed.to_string();
-                }
-            }
         }
-        s
     }
 
     pub fn selected_seeds(&self) -> Vec<String> {
@@ -86,7 +76,7 @@ impl CrawlState {
     }
 }
 
-pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store, _toasts: &mut ToastQueue) {
+pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store, _toasts: &mut ToastQueue, dirty: &mut bool) {
     widgets::section_header(ui, "Crawl", Some("Pull a Fandom/MediaWiki wiki into your library."));
 
     ui.horizontal(|ui| {
@@ -98,11 +88,7 @@ pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store, _toasts: &mut To
                 .font(egui::FontId::proportional(14.0)),
         );
         if r.lost_focus() && !state.wiki_url.is_empty() {
-            if let Some(pd) = ProjectDirs::from("com", "LorebookBuilder", "LorebookBuilder") {
-                let p = pd.config_dir().join("last_wiki.txt");
-                let _ = std::fs::create_dir_all(pd.config_dir());
-                let _ = std::fs::write(p, &state.wiki_url);
-            }
+            *dirty = true;
         }
     });
 
@@ -110,7 +96,9 @@ pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store, _toasts: &mut To
     ui.label(RichText::new("Seed categories:").strong());
     ui.horizontal_wrapped(|ui| {
         for c in state.categories.iter_mut() {
-            ui.checkbox(&mut c.enabled, &c.name);
+            if ui.checkbox(&mut c.enabled, &c.name).changed() {
+                *dirty = true;
+            }
         }
     });
 

@@ -421,4 +421,26 @@ impl Store {
         for e in entries { out.push(self.hydrate(e)?); }
         Ok(out)
     }
+
+    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO settings(key,value) VALUES (?,?) \
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            params![key, value],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        let v = self.conn.query_row(
+            "SELECT value FROM settings WHERE key = ?",
+            params![key],
+            |r| r.get::<_, String>(0),
+        );
+        match v {
+            Ok(s) => Ok(Some(s)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
 }

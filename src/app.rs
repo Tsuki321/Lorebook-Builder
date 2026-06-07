@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use eframe::egui::{self, Context, RichText, TopBottomPanel};
 use parking_lot::Mutex;
 
+use crate::config::UserConfig;
 use crate::crawler::ProgressEvent;
 use crate::model::Store;
 use crate::tabs;
@@ -43,29 +44,74 @@ pub struct App {
     pub export_state: tabs::export::ExportState,
     pub toasts: ToastQueue,
     pub entries_count_cache: u64,
+    pub config: UserConfig,
 }
 
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>, store: Store) -> Self {
-        theme::apply(&cc.egui_ctx, ThemeChoice::Mocha);
-        let lib = tabs::library::LibraryState::new();
+        let config = UserConfig::load();
+        let theme = config.theme.as_deref()
+            .and_then(ThemeChoice::from_key)
+            .unwrap_or(ThemeChoice::Mocha);
+        theme::apply(&cc.egui_ctx, theme);
+
+        let mut crawl_state = tabs::crawl::CrawlState::new();
+        if let Some(url) = &config.last_wiki_url {
+            crawl_state.wiki_url = url.clone();
+        }
+        // Apply enabled-seeds selection from config
+        for c in crawl_state.categories.iter_mut() {
+            c.enabled = config.enabled_seeds.iter().any(|s| s == &c.name);
+        }
+
+        let mut export_state = tabs::export::ExportState::new();
+        if let Some(p) = &config.last_export_path {
+            let path = std::path::PathBuf::from(p);
+            if !p.trim().is_empty() {
+                export_state.output_path = path;
+            }
+        }
+
         let mut s = Self {
             active_tab: Tab::Crawl,
-            theme: ThemeChoice::Mocha,
+            theme,
             store: Mutex::new(store),
-            crawl_state: tabs::crawl::CrawlState::new(),
-            library_state: lib,
-            export_state: tabs::export::ExportState::new(),
+            crawl_state,
+            library_state: tabs::library::LibraryState::new(),
+            export_state,
             toasts: ToastQueue::new(),
             entries_count_cache: 0,
+            config,
         };
         s.refresh_entries_count();
+        info!(
+            theme = s.theme.as_key(),
+            wiki_url = %s.crawl_state.wiki_url,
+            entries = s.entries_count_cache,
+            "app initialised from config"
+        );
         s
     }
 
     pub fn refresh_entries_count(&mut self) {
         if let Ok(s) = self.store.lock().count() {
             self.entries_count_cache = s;
+        }
+    }
+
+    /// Snapshot the current state into UserConfig and write to disk.
+    /// Called by anything that mutates persistent state (theme picker,
+    /// wiki URL, export path, seed-category checkboxes).
+    pub fn persist_config(&mut self) {
+        self.config.theme = Some(self.theme.as_key().to_string());
+        self.config.last_wiki_url = Some(self.crawl_state.wiki_url.clone());
+        self.config.last_export_path = Some(self.export_state.output_path.to_string_lossy().to_string());
+        self.config.enabled_seeds = self.crawl_state.categories.iter()
+            .filter(|c| c.enabled)
+            .map(|c| c.name.clone())
+            .collect();
+        if let Err(e) = self.config.save() {
+            tracing::warn!(error = %e, "failed to save config");
         }
     }
 }
@@ -107,6 +153,7 @@ impl App {
                                     if ui.selectable_label(self.theme == t, t.display()).clicked() {
                                         self.theme = t;
                                         theme::apply(ctx, t);
+                                        self.persist_config();
                                     }
                                 }
                                 None::<()>
@@ -176,19 +223,24 @@ impl App {
                 .fill(ctx.style().visuals.faint_bg_color)
                 .inner_margin(egui::Margin::same(14)))
             .show(ctx, |ui| {
-                let store = self.store.lock();
-                match self.active_tab {
-                    Tab::Crawl => {
-                        let _ = tabs::crawl::draw(ui, &mut self.crawl_state, &store, &mut self.toasts);
-                    }
-                    Tab::Library => {
-                        tabs::library::draw(ui, &mut self.library_state, &store, &mut self.toasts);
-                    }
-                    Tab::Export => {
-                        tabs::export::draw(ui, &mut self.export_state, &store, &mut self.toasts);
+                let mut dirty = false;
+                {
+                    let store = self.store.lock();
+                    match self.active_tab {
+                        Tab::Crawl => {
+                            let _ = tabs::crawl::draw(ui, &mut self.crawl_state, &store, &mut self.toasts, &mut dirty);
+                        }
+                        Tab::Library => {
+                            tabs::library::draw(ui, &mut self.library_state, &store, &mut self.toasts);
+                        }
+                        Tab::Export => {
+                            tabs::export::draw(ui, &mut self.export_state, &store, &mut self.toasts, &mut dirty);
+                        }
                     }
                 }
-                drop(store);
+                if dirty {
+                    self.persist_config();
+                }
                 if matches!(self.active_tab, Tab::Library) {
                     self.refresh_entries_count();
                 }
@@ -261,6 +313,12 @@ impl App {
 pub fn data_dir() -> PathBuf {
     directories::ProjectDirs::from("com", "LorebookBuilder", "LorebookBuilder")
         .map(|p| p.data_dir().to_path_buf())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
+}
+
+pub fn config_path() -> PathBuf {
+    directories::ProjectDirs::from("com", "LorebookBuilder", "LorebookBuilder")
+        .map(|p| p.config_dir().to_path_buf())
         .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
 }
 
