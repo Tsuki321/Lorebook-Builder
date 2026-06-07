@@ -313,25 +313,6 @@ impl Store {
         Ok(out)
     }
 
-    pub fn search(&self, q: &str, limit: usize) -> Result<Vec<WorldInfoEntry>> {
-        let mut stmt = self.conn.prepare(
-            r#"SELECT DISTINCT e.uid,e.name,e.comment,e.content,e.priority,e.position,
-                      e.depth,e.probability,e.enabled,e.constant,e.selective,
-                      e.selective_logic,e.disable,e.add_memo,e.exclude_recursion,
-                      e.use_probability,e.case_sensitive,e.insertion_order
-               FROM entries e
-               LEFT JOIN entry_keys k ON k.uid = e.uid
-               WHERE e.name LIKE ?1 OR e.comment LIKE ?1 OR e.content LIKE ?1
-                  OR k.key LIKE ?1
-               ORDER BY e.uid LIMIT ?2"#,
-        )?;
-        let pattern = format!("%{}%", q);
-        let rows = stmt.query_map(params![pattern, limit as i64], Self::row_to_entry)?;
-        let mut out = Vec::new();
-        for r in rows { out.push(r?); }
-        Ok(out)
-    }
-
     fn row_to_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<WorldInfoEntry> {
         let uid: i64 = row.get(0)?;
         let name: String = row.get(1)?;
