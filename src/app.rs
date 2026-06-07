@@ -8,6 +8,7 @@ use crate::model::Store;
 use crate::tabs;
 use crate::theme::{self, ThemeChoice};
 use crate::ui::toast::{self, ToastQueue};
+use tracing::{debug, info};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
@@ -71,7 +72,22 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        // Top bar
+        self.show_top_bar(ctx);
+        self.show_status_bar(ctx);
+        self.show_sidebar(ctx);
+        self.show_central(ctx);
+        self.drain_crawl_events();
+        self.handle_shortcuts(ctx);
+
+        self.toasts.tick();
+        toast::render(ctx, &self.toasts);
+
+        ctx.request_repaint_after(std::time::Duration::from_millis(200));
+    }
+}
+
+impl App {
+    fn show_top_bar(&mut self, ctx: &Context) {
         TopBottomPanel::top("topbar")
             .frame(egui::Frame::new()
                 .fill(ctx.style().visuals.window_fill)
@@ -98,32 +114,33 @@ impl eframe::App for App {
                     });
                 });
             });
+    }
 
-        // Bottom status bar
+    fn show_status_bar(&self, ctx: &Context) {
         TopBottomPanel::bottom("statusbar")
             .frame(egui::Frame::new()
                 .fill(ctx.style().visuals.window_fill)
                 .inner_margin(egui::Margin::symmetric(14, 6)))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    let status = if self.crawl_state.running { "● Crawler: running" }
-                                 else { "● Crawler: idle" };
-                    ui.label(RichText::new(status).size(12.0));
+                    let dot = if self.crawl_state.running { "🟡" } else { "🟢" };
+                    let status = if self.crawl_state.running { "Crawler: running" } else { "Crawler: idle" };
+                    ui.label(RichText::new(format!("{dot} {status}")).size(12.0));
                     ui.add_space(12.0);
                     if self.crawl_state.running {
                         ui.label(RichText::new(format!("OK {} / Err {} / Cached {}",
                             self.crawl_state.ok, self.crawl_state.err, self.crawl_state.cached)).size(12.0).weak());
                     } else if !self.crawl_state.last_message.is_empty() {
-                        let msg = &self.crawl_state.last_message;
-                        ui.label(RichText::new(msg).size(12.0).weak());
+                        ui.label(RichText::new(&self.crawl_state.last_message).size(12.0).weak());
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.hyperlink_to("v0.1.0 · MIT", "https://github.com/Tsuki321/Lorebook-Builder");
                     });
                 });
             });
+    }
 
-        // Sidebar
+    fn show_sidebar(&mut self, ctx: &Context) {
         egui::SidePanel::left("sidebar")
             .resizable(false)
             .exact_width(180.0)
@@ -151,8 +168,9 @@ impl eframe::App for App {
                 ui.label(RichText::new("Ctrl+2  Library").size(11.0).weak());
                 ui.label(RichText::new("Ctrl+3  Export").size(11.0).weak());
             });
+    }
 
-        // Central panel — active tab
+    fn show_central(&mut self, ctx: &Context) {
         egui::CentralPanel::default()
             .frame(egui::Frame::new()
                 .fill(ctx.style().visuals.faint_bg_color)
@@ -175,68 +193,68 @@ impl eframe::App for App {
                     self.refresh_entries_count();
                 }
             });
+    }
 
-        // Drain crawl channel (toast any failed page)
-        loop {
-            let ev = {
-                if let Some(rx) = &self.crawl_state.rx {
-                    match rx.try_recv() {
-                        Ok(e) => e,
-                        Err(_) => break,
-                    }
-                } else {
-                    break;
-                }
-            };
-            match ev {
-                ProgressEvent::Done => {
-                    self.refresh_entries_count();
-                    self.toasts.success(format!(
-                        "Crawl complete — {} entries, {} errors",
-                        self.crawl_state.entries_built, self.crawl_state.err
-                    ));
-                }
-                ProgressEvent::Cancelled => {
-                    self.refresh_entries_count();
-                    self.crawl_state.last_message = "Cancelled.".into();
-                    self.toasts.warn("Crawl cancelled.");
-                }
-                ProgressEvent::PageFetched { title, cached, .. } => {
-                    if cached {
-                        self.crawl_state.cached += 1;
-                    } else {
-                        self.crawl_state.ok += 1;
-                    }
-                    self.crawl_state.log.push((now_hms_c(), format!("Fetched {title}")));
-                }
-                ProgressEvent::CategoryEntered { title, total_in } => {
-                    self.crawl_state.total_in = self.crawl_state.total_in.saturating_add(total_in as u64);
-                    self.crawl_state.log.push((now_hms_c(), format!("→ Category {title} ({total_in} pages)")));
-                }
-                ProgressEvent::EntryBuilt { name, .. } => {
-                    self.crawl_state.entries_built += 1;
-                    self.crawl_state.log.push((now_hms_c(), format!("Stored entry: {name}")));
-                    self.refresh_entries_count();
-                }
-                ProgressEvent::PageFailed { title, error } => {
-                    self.crawl_state.err += 1;
-                    self.crawl_state.log.push((now_hms_c(), format!("FAIL {title}: {error}")));
-                    self.crawl_state.last_message = format!("Error: {title}");
-                    self.toasts.error(format!("{title}: {error}"));
-                }
+    fn drain_crawl_events(&mut self) {
+        while let Some(ev) = self.crawl_state.rx.as_ref().and_then(|rx| rx.try_recv().ok()) {
+            self.handle_progress_event(ev);
+        }
+    }
+
+    fn handle_progress_event(&mut self, ev: ProgressEvent) {
+        match ev {
+            ProgressEvent::Done => {
+                self.refresh_entries_count();
+                info!(
+                    built = self.crawl_state.entries_built,
+                    errors = self.crawl_state.err,
+                    ok = self.crawl_state.ok,
+                    cached = self.crawl_state.cached,
+                    "crawl complete"
+                );
+                self.toasts.success(format!(
+                    "Crawl complete — {} entries, {} errors",
+                    self.crawl_state.entries_built, self.crawl_state.err
+                ));
+            }
+            ProgressEvent::Cancelled => {
+                self.refresh_entries_count();
+                info!(
+                    built = self.crawl_state.entries_built,
+                    "crawl cancelled"
+                );
+                self.crawl_state.last_message = "Cancelled.".into();
+                self.toasts.warn("Crawl cancelled.");
+            }
+            ProgressEvent::PageFetched { title, cached, .. } => {
+                if cached { self.crawl_state.cached += 1; } else { self.crawl_state.ok += 1; }
+                debug!(title = %title, cached, "page fetched");
+                self.crawl_state.log.push((now_hms_c(), format!("Fetched {title}")));
+            }
+            ProgressEvent::CategoryEntered { title, total_in } => {
+                self.crawl_state.total_in = self.crawl_state.total_in.saturating_add(total_in as u64);
+                debug!(title = %title, total_in, "category entered");
+                self.crawl_state.log.push((now_hms_c(), format!("→ Category {title} ({total_in} pages)")));
+            }
+            ProgressEvent::EntryBuilt { name, .. } => {
+                self.crawl_state.entries_built += 1;
+                debug!(name = %name, "entry built");
+                self.crawl_state.log.push((now_hms_c(), format!("Stored entry: {name}")));
+                self.refresh_entries_count();
+            }
+            ProgressEvent::PageFailed { title, error } => {
+                self.crawl_state.err += 1;
+                self.crawl_state.log.push((now_hms_c(), format!("FAIL {title}: {error}")));
+                self.crawl_state.last_message = format!("Error: {title}");
+                self.toasts.error(format!("{title}: {error}"));
             }
         }
+    }
 
-        // Render floating toasts
-        self.toasts.tick();
-        toast::render(ctx, &self.toasts);
-
-        // Keyboard shortcuts
+    fn handle_shortcuts(&mut self, ctx: &Context) {
         if ctx.input(|i| i.key_pressed(egui::Key::Num1) && i.modifiers.command) { self.active_tab = Tab::Crawl; }
         if ctx.input(|i| i.key_pressed(egui::Key::Num2) && i.modifiers.command) { self.active_tab = Tab::Library; }
         if ctx.input(|i| i.key_pressed(egui::Key::Num3) && i.modifiers.command) { self.active_tab = Tab::Export; }
-
-        ctx.request_repaint_after(std::time::Duration::from_millis(200));
     }
 }
 

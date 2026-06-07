@@ -6,6 +6,7 @@ use crate::export;
 use crate::model::{Store, WorldInfo};
 use crate::ui::toast::ToastQueue;
 use crate::ui::widgets;
+use tracing::info;
 
 pub struct ExportState {
     pub output_path: PathBuf,
@@ -109,6 +110,7 @@ fn do_export(state: &mut ExportState, store: &Store, toasts: &mut ToastQueue) {
             let s = export::to_string_pretty(&wb);
             match std::fs::write(&state.output_path, s) {
                 Ok(()) => {
+                    info!(entries = n, path = %path_display, "exported lorebook");
                     toasts.success(format!("Exported {n} entries to {path_display}"));
                 }
                 Err(e) => {

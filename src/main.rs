@@ -29,6 +29,8 @@ fn main() -> eframe::Result<()> {
         }
     };
 
+    tracing::info!(data_dir = %data_dir.display(), db_path = %db_path.display(), "Lorebook Builder starting");
+
     let viewport = egui::ViewportBuilder::default()
         .with_title("Lorebook Builder")
         .with_inner_size([1280.0, 820.0])
