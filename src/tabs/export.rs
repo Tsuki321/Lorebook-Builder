@@ -23,8 +23,8 @@ pub struct ExportState {
 
 impl ExportState {
     pub fn new() -> Self {
-        let default = directories::ProjectDirs::from("com", "LorebookBuilder", "LorebookBuilder")
-            .map(|p| p.download_dir().unwrap_or(std::env::current_dir().unwrap_or_default()).join("lorebook.json"))
+        let default = directories::UserDirs::new()
+            .map(|u| u.document_dir().unwrap_or_else(|| u.home_dir()).join("lorebook.json"))
             .unwrap_or_else(|| PathBuf::from("lorebook.json"));
         Self {
             output_path: default,
