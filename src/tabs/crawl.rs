@@ -166,6 +166,13 @@ pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store, _toasts: &mut To
     }
 
     ui.collapsing(RichText::new(format!("Log ({} entries)", state.log.len())).strong(), |ui| {
+        ui.horizontal(|ui| {
+            if ui.add_enabled(!state.log.is_empty() && !state.running, egui::Button::new("🧹  Clear log"))
+                .on_hover_text("Wipe the log (disabled while a crawl is running)")
+                .clicked() {
+                state.log.clear();
+            }
+        });
         egui::ScrollArea::vertical()
             .max_height(200.0)
             .stick_to_bottom(true)

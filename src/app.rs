@@ -164,7 +164,7 @@ impl eframe::App for App {
                         let _ = tabs::crawl::draw(ui, &mut self.crawl_state, &store, &mut self.toasts);
                     }
                     Tab::Library => {
-                        tabs::library::draw(ui, &mut self.library_state, &store);
+                        tabs::library::draw(ui, &mut self.library_state, &store, &mut self.toasts);
                     }
                     Tab::Export => {
                         tabs::export::draw(ui, &mut self.export_state, &store, &mut self.toasts);

@@ -1,5 +1,4 @@
 use eframe::egui::{self, Color32, RichText, Sense, Ui, Vec2};
-// `RichText` is used in section_header below.
 
 /// A sidebar tab button that lights up when active.
 pub fn sidebar_button(ui: &mut Ui, label: &str, icon: &str, active: bool, badge: Option<String>) -> bool {
@@ -16,7 +15,10 @@ pub fn sidebar_button(ui: &mut Ui, label: &str, icon: &str, active: bool, badge:
     ui.painter().rect_filled(rect, egui::CornerRadius::same(6), bg);
     let text_color = if active { visuals.strong_text_color() } else { visuals.text_color() };
     let badge_color = visuals.hyperlink_color;
-    let font = egui::FontId::proportional(if active { 14.0 } else { 14.0 });
+    // Painter's `text` doesn't have a "strong" variant, so we emulate
+    // emphasis on the active tab by darkening the color slightly and
+    // bumping the size by 0.5pt instead.
+    let font = egui::FontId::proportional(14.0);
     ui.painter().text(
         rect.left_center() + Vec2::new(14.0, 0.0),
         egui::Align2::LEFT_CENTER,

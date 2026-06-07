@@ -1,6 +1,7 @@
 use eframe::egui::{self, Color32, RichText, TextEdit, Ui};
 
 use crate::model::{Store, WorldInfoEntry};
+use crate::ui::toast::ToastQueue;
 use crate::ui::{editor, table, widgets};
 
 pub struct LibraryState {
@@ -38,7 +39,7 @@ impl LibraryState {
     }
 }
 
-pub fn draw(ui: &mut Ui, state: &mut LibraryState, store: &Store) {
+pub fn draw(ui: &mut Ui, state: &mut LibraryState, store: &Store, toasts: &mut ToastQueue) {
     widgets::section_header(
         ui,
         "Library",
@@ -46,8 +47,8 @@ pub fn draw(ui: &mut Ui, state: &mut LibraryState, store: &Store) {
     );
 
     // Toolbar
-    ui.horizontal(|ui| {
-        if ui.button("🔄  Reload from DB").clicked() { state.reload(store); }
+    ui.horizontal_wrapped(|ui| {
+        if ui.button("🔄  Reload").clicked() { state.reload(store); }
         if ui.button("➕  Add row").clicked() {
             let uid = store.max_uid().unwrap_or(0) + 1;
             let name = if state.new_entry_name.is_empty() {
@@ -56,22 +57,43 @@ pub fn draw(ui: &mut Ui, state: &mut LibraryState, store: &Store) {
                 state.new_entry_name.clone()
             };
             let e = WorldInfoEntry::new(uid, name, Vec::new(), String::new(), String::new(), 50, 1);
-            if let Err(e) = store.upsert_entry(&e, 0, 0, "", "") {
-                state.error = Some(format!("add: {e:#}"));
-            } else {
-                state.entries.push(e);
+            match store.upsert_entry(&e, 0, 0, "", "") {
+                Ok(()) => {
+                    state.entries.push(e);
+                    toasts.success(format!("Added entry #{uid}"));
+                }
+                Err(err) => {
+                    state.error = Some(format!("add: {err:#}"));
+                    toasts.error(format!("Add failed: {err:#}"));
+                }
             }
             state.new_entry_name.clear();
         }
         let mut new_name = state.new_entry_name.clone();
-        if ui.add_sized([160.0, 24.0], TextEdit::singleline(&mut new_name).hint_text("New row name")).changed() {
+        if ui.add_sized([140.0, 24.0], TextEdit::singleline(&mut new_name).hint_text("New row name")).changed() {
             state.new_entry_name = new_name;
         }
         ui.separator();
         ui.label("Search:");
         let mut q = state.search.clone();
-        if ui.add_sized([220.0, 24.0], TextEdit::singleline(&mut q).hint_text("name / key / content")).changed() {
+        if ui.add_sized([200.0, 24.0], TextEdit::singleline(&mut q).hint_text("name / key / content")).changed() {
             state.search = q;
+        }
+        ui.separator();
+        if ui.add_enabled(state.selected.is_some(), egui::Button::new("⎘  Duplicate"))
+            .on_hover_text("Make a copy of the selected entry")
+            .clicked() {
+            duplicate_selected(state, store, toasts);
+        }
+        if ui.add_enabled(state.selected.is_some(), egui::Button::new("🗑  Delete"))
+            .on_hover_text("Delete the selected entry from the library")
+            .clicked() {
+            delete_selected(state, store, toasts);
+        }
+        if ui.add_enabled(!state.entries.is_empty(), egui::Button::new("🧹  Clear all"))
+            .on_hover_text("Delete every entry from the library")
+            .clicked() {
+            clear_all(state, store, toasts);
         }
         ui.separator();
         ui.selectable_value(&mut state.view, ViewMode::Table, "📋  Table");
@@ -138,13 +160,11 @@ pub fn draw(ui: &mut Ui, state: &mut LibraryState, store: &Store) {
                             }
                             ui.add_space(8.0);
                             ui.horizontal(|ui| {
+                                if ui.button("⎘  Duplicate").clicked() {
+                                    duplicate_selected(state, store, toasts);
+                                }
                                 if ui.button("🗑  Delete entry").clicked() {
-                                    if let Err(err) = store.delete_entry(uid) {
-                                        state.error = Some(format!("delete: {err:#}"));
-                                    } else {
-                                        state.entries.retain(|x| x.uid != uid);
-                                        state.selected = None;
-                                    }
+                                    delete_selected(state, store, toasts);
                                 }
                             });
                         }
@@ -156,6 +176,58 @@ pub fn draw(ui: &mut Ui, state: &mut LibraryState, store: &Store) {
                     }
                 });
             });
+        }
+    }
+}
+
+fn duplicate_selected(state: &mut LibraryState, store: &Store, toasts: &mut ToastQueue) {
+    let Some(uid) = state.selected else { return; };
+    let Some(src) = state.entries.iter().find(|e| e.uid == uid).cloned() else { return; };
+    let new_uid = store.max_uid().unwrap_or(0) + 1;
+    let mut copy = src.clone();
+    copy.uid = new_uid;
+    copy.name = format!("{} (copy)", src.name);
+    copy.order = new_uid;
+    copy.insertion_order = new_uid;
+    match store.upsert_entry(&copy, 0, 0, "", "") {
+        Ok(()) => {
+            state.entries.push(copy);
+            state.selected = Some(new_uid);
+            toasts.success(format!("Duplicated as #{new_uid}"));
+        }
+        Err(err) => {
+            state.error = Some(format!("duplicate: {err:#}"));
+            toasts.error(format!("Duplicate failed: {err:#}"));
+        }
+    }
+}
+
+fn delete_selected(state: &mut LibraryState, store: &Store, toasts: &mut ToastQueue) {
+    let Some(uid) = state.selected else { return; };
+    let name = state.entries.iter().find(|e| e.uid == uid).map(|e| e.name.clone()).unwrap_or_default();
+    match store.delete_entry(uid) {
+        Ok(()) => {
+            state.entries.retain(|x| x.uid != uid);
+            state.selected = None;
+            toasts.success(format!("Deleted '{}'", name));
+        }
+        Err(err) => {
+            state.error = Some(format!("delete: {err:#}"));
+            toasts.error(format!("Delete failed: {err:#}"));
+        }
+    }
+}
+
+fn clear_all(state: &mut LibraryState, store: &Store, toasts: &mut ToastQueue) {
+    match store.clear_all() {
+        Ok(n) => {
+            state.entries.clear();
+            state.selected = None;
+            toasts.warn(format!("Cleared {n} entries from library"));
+        }
+        Err(err) => {
+            state.error = Some(format!("clear: {err:#}"));
+            toasts.error(format!("Clear failed: {err:#}"));
         }
     }
 }

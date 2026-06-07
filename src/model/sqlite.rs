@@ -163,6 +163,13 @@ impl Store {
         Ok(())
     }
 
+    /// Wipe every entry (and its keys) from the library.
+    /// Returns the number of rows deleted.
+    pub fn clear_all(&self) -> Result<u64> {
+        let n = self.conn.execute("DELETE FROM entries", [])? as u64;
+        Ok(n)
+    }
+
     pub fn max_uid(&self) -> Result<u64> {
         let v: Option<i64> = self.conn
             .query_row("SELECT MAX(uid) FROM entries", [], |r| r.get(0))?;
@@ -413,27 +420,5 @@ impl Store {
         let mut out = Vec::with_capacity(entries.len());
         for e in entries { out.push(self.hydrate(e)?); }
         Ok(out)
-    }
-
-    pub fn set_setting(&self, key: &str, value: &str) -> Result<()> {
-        self.conn.execute(
-            "INSERT INTO settings(key,value) VALUES (?,?) \
-             ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-            params![key, value],
-        )?;
-        Ok(())
-    }
-
-    pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
-        let v = self.conn.query_row(
-            "SELECT value FROM settings WHERE key = ?",
-            params![key],
-            |r| r.get::<_, String>(0),
-        );
-        match v {
-            Ok(s) => Ok(Some(s)),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(e.into()),
-        }
     }
 }

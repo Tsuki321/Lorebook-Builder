@@ -92,10 +92,4 @@ fn polish(style: &mut egui::Style, dark: bool) {
         style.visuals.selection.bg_fill = Color32::from_rgba_unmultiplied(30, 102, 197, 40);
         style.visuals.selection.stroke = Stroke::new(1.0, Color32::from_rgb(30, 102, 197));
     }
-
-    // Larger fonts for headings
-    style.text_styles.insert(
-        egui::TextStyle::Name("title".into()),
-        FontId::new(20.0, FontFamily::Proportional),
-    );
 }
