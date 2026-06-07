@@ -187,8 +187,8 @@ fn duplicate_selected(state: &mut LibraryState, store: &Store, toasts: &mut Toas
     let mut copy = src.clone();
     copy.uid = new_uid;
     copy.name = format!("{} (copy)", src.name);
-    copy.order = new_uid;
-    copy.insertion_order = new_uid;
+    copy.order = new_uid as u32;
+    copy.insertion_order = new_uid as u32;
     match store.upsert_entry(&copy, 0, 0, "", "") {
         Ok(()) => {
             state.entries.push(copy);

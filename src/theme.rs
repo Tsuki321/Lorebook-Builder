@@ -1,5 +1,5 @@
 use catppuccin_egui::{FRAPPE, LATTE, MACCHIATO, MOCHA};
-use eframe::egui::{self, Color32, Context, CornerRadius, FontFamily, FontId, Margin, Stroke, Theme};
+use eframe::egui::{self, Color32, Context, CornerRadius, Margin, Stroke, Theme};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ThemeChoice {
