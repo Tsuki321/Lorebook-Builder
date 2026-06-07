@@ -119,7 +119,7 @@ impl eframe::App for App {
                         ui.label(RichText::new(msg).size(12.0).weak());
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.hyperlink_to("v0.1.0 · MIT", "https://github.com/anomalyco/lorebook-builder");
+                        ui.hyperlink_to("v0.1.0 · MIT", "https://github.com/Tsuki321/Lorebook-Builder");
                     });
                 });
             });
@@ -195,6 +195,10 @@ impl eframe::App for App {
                     self.toast = Some((Color32::from_rgb(60, 180, 100), "Crawl complete.".into()));
                     self.toast_until = Some(std::time::Instant::now() + std::time::Duration::from_secs(4));
                 }
+                ProgressEvent::Cancelled => {
+                    self.refresh_entries_count();
+                    self.crawl_state.last_message = "Cancelled.".into();
+                }
                 ProgressEvent::PageFetched { title, cached, .. } => {
                     if cached {
                         self.crawl_state.cached += 1;
@@ -215,10 +219,7 @@ impl eframe::App for App {
                 ProgressEvent::PageFailed { title, error } => {
                     self.crawl_state.err += 1;
                     self.crawl_state.log.push((now_hms_c(), format!("FAIL {title}: {error}")));
-                    if error.contains("tokio") || error.contains("init") {
-                        self.toast = Some((Color32::from_rgb(200, 80, 80), format!("Crawl error: {error}")));
-                        self.toast_until = Some(std::time::Instant::now() + std::time::Duration::from_secs(6));
-                    }
+                    self.crawl_state.last_message = format!("Error: {title}");
                 }
             }
         }

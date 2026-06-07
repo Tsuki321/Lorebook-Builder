@@ -12,7 +12,7 @@ use serde_json::Value;
 pub type Limiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
 
 const USER_AGENT: &str =
-    "wiki-lore-crawler/0.1 (https://github.com/anomalyco/lorebook-builder)";
+    "wiki-lore-crawler/0.1 (https://github.com/Tsuki321/Lorebook-Builder)";
 
 /// MediaWiki API client with rate limiting and automatic continue-token
 /// pagination.

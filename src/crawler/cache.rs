@@ -70,19 +70,6 @@ impl Cache {
         self.save_index()?;
         Ok(())
     }
-
-    pub fn clear(&mut self) -> Result<()> {
-        self.index.clear();
-        for e in std::fs::read_dir(&self.dir).unwrap_or_else(|_| std::fs::read_dir(".").unwrap()) {
-            if let Ok(ent) = e {
-                if ent.path().extension().map(|e| e == "json").unwrap_or(false) {
-                    let _ = std::fs::remove_file(ent.path());
-                }
-            }
-        }
-        self.save_index()?;
-        Ok(())
-    }
 }
 
 fn sanitize(s: &str) -> String {

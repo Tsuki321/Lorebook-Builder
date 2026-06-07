@@ -175,6 +175,36 @@ impl Store {
     }
 
     pub fn list_all(&self) -> Result<Vec<WorldInfoEntry>> {
+        self.list_all_with_keys()
+    }
+
+    /// Single-query equivalent of `list_all` + `hydrate_all`.
+    /// Avoids the N+1 query pattern of calling `keys_for` per row.
+    pub fn list_all_with_keys(&self) -> Result<Vec<WorldInfoEntry>> {
+        // First fetch all keys grouped by uid in a single query.
+        let mut keys_map: std::collections::HashMap<i64, (Vec<String>, Vec<String>)> =
+            std::collections::HashMap::new();
+        {
+            let mut stmt = self.conn.prepare(
+                "SELECT uid, key, kind FROM entry_keys ORDER BY uid, kind, key",
+            )?;
+            let rows = stmt.query_map([], |r| {
+                let uid: i64 = r.get(0)?;
+                let k: String = r.get(1)?;
+                let kind: String = r.get(2)?;
+                Ok((uid, k, kind))
+            })?;
+            for r in rows {
+                let (uid, k, kind) = r?;
+                let entry = keys_map.entry(uid).or_default();
+                if kind == "secondary" {
+                    entry.1.push(k);
+                } else {
+                    entry.0.push(k);
+                }
+            }
+        }
+
         let mut stmt = self.conn.prepare(
             r#"SELECT uid,name,comment,content,priority,position,depth,probability,
                       enabled,constant,selective,selective_logic,disable,add_memo,
@@ -182,9 +212,104 @@ impl Store {
                FROM entries
                ORDER BY uid"#,
         )?;
-        let rows = stmt.query_map([], Self::row_to_entry)?;
+        let rows = stmt.query_map([], |row| {
+            let mut e = Self::row_to_entry(row)?;
+            let uid = e.uid as i64;
+            if let Some((primary, secondary)) = keys_map.remove(&uid) {
+                e.keys = primary.clone();
+                e.key = primary;
+                e.secondary_keys = secondary.clone();
+                e.keysecondary = secondary;
+            }
+            Ok(e)
+        })?;
         let mut out = Vec::new();
         for r in rows { out.push(r?); }
+        Ok(out)
+    }
+
+    pub fn search(&self, q: &str, limit: usize) -> Result<Vec<WorldInfoEntry>> {
+        self.search_with_keys(q, limit)
+    }
+
+    /// Single-query search with keys attached.
+    pub fn search_with_keys(&self, q: &str, limit: usize) -> Result<Vec<WorldInfoEntry>> {
+        let pattern = format!("%{}%", q);
+        // First, find matching uids via the cheap index lookup.
+        let matching_uids: Vec<i64> = {
+            let mut stmt = self.conn.prepare(
+                r#"SELECT DISTINCT uid FROM entry_keys WHERE key LIKE ?1
+                   UNION
+                   SELECT uid FROM entries
+                    WHERE name LIKE ?1 OR comment LIKE ?1 OR content LIKE ?1
+                   ORDER BY uid LIMIT ?2"#,
+            )?;
+            let rows = stmt.query_map(params![pattern, limit as i64], |r| {
+                let uid: i64 = r.get(0)?;
+                Ok(uid)
+            })?;
+            let mut out = Vec::new();
+            for r in rows { out.push(r?); }
+            out
+        };
+        if matching_uids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Then fetch full rows for those uids in one go.
+        let placeholders: Vec<String> = (1..=matching_uids.len()).map(|i| format!("?{}", i)).collect();
+        let sql = format!(
+            r#"SELECT uid,name,comment,content,priority,position,depth,probability,
+                      enabled,constant,selective,selective_logic,disable,add_memo,
+                      exclude_recursion,use_probability,case_sensitive,insertion_order
+               FROM entries WHERE uid IN ({}) ORDER BY uid"#,
+            placeholders.join(",")
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let mut params_vec: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(matching_uids.len());
+        for u in &matching_uids { params_vec.push(u); }
+        let rows = stmt.query_map(rusqlite::params_from_iter(params_vec), Self::row_to_entry)?;
+
+        // And keys for those uids in one go.
+        let mut keys_map: std::collections::HashMap<i64, (Vec<String>, Vec<String>)> =
+            std::collections::HashMap::new();
+        {
+            let placeholders_k: Vec<String> = (1..=matching_uids.len()).map(|i| format!("?{}", i)).collect();
+            let sql_k = format!(
+                "SELECT uid, key, kind FROM entry_keys WHERE uid IN ({}) ORDER BY uid, kind, key",
+                placeholders_k.join(",")
+            );
+            let mut stmt_k = self.conn.prepare(&sql_k)?;
+            let mut params_k: Vec<&dyn rusqlite::ToSql> = Vec::with_capacity(matching_uids.len());
+            for u in &matching_uids { params_k.push(u); }
+            let rows_k = stmt_k.query_map(rusqlite::params_from_iter(params_k), |r| {
+                let uid: i64 = r.get(0)?;
+                let k: String = r.get(1)?;
+                let kind: String = r.get(2)?;
+                Ok((uid, k, kind))
+            })?;
+            for r in rows_k {
+                let (uid, k, kind) = r?;
+                let entry = keys_map.entry(uid).or_default();
+                if kind == "secondary" {
+                    entry.1.push(k);
+                } else {
+                    entry.0.push(k);
+                }
+            }
+        }
+
+        let mut out = Vec::new();
+        for r in rows {
+            let mut e = r?;
+            if let Some((primary, secondary)) = keys_map.remove(&(e.uid as i64)) {
+                e.keys = primary.clone();
+                e.key = primary;
+                e.secondary_keys = secondary.clone();
+                e.keysecondary = secondary;
+            }
+            out.push(e);
+        }
         Ok(out)
     }
 

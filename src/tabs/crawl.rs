@@ -1,5 +1,7 @@
 use std::path::PathBuf;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::atomic::AtomicBool;
+use std::sync::mpsc::Receiver;
+use std::sync::Arc;
 use std::time::Instant;
 
 use directories::ProjectDirs;
@@ -25,7 +27,7 @@ pub struct CrawlState {
     pub total_in: u64,
     pub last_message: String,
     pub rx: Option<Receiver<ProgressEvent>>,
-    pub tx: Option<Sender<ProgressEvent>>,
+    pub cancel: Option<Arc<AtomicBool>>,
     pub error: Option<String>,
     pub log: Vec<(String, String)>,
 }
@@ -56,11 +58,13 @@ impl CrawlState {
             ..Default::default()
         };
         if let Some(pd) = ProjectDirs::from("com", "LorebookBuilder", "LorebookBuilder") {
-            s.wiki_url = pd
-                .config_dir()
-                .join("last_wiki.txt")
-                .to_string_lossy()
-                .into_owned();
+            let p = pd.config_dir().join("last_wiki.txt");
+            if let Ok(saved) = std::fs::read_to_string(&p) {
+                let trimmed = saved.trim();
+                if !trimmed.is_empty() {
+                    s.wiki_url = trimmed.to_string();
+                }
+            }
         }
         s
     }
@@ -125,9 +129,11 @@ pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store) {
     }
     if state.running {
         ui.horizontal(|ui| {
-            if ui.button("⏹  Stop").clicked() {
-                state.running = false;
-                state.last_message = "Stopping…".into();
+            if ui.button("⏹  Cancel").on_hover_text("Stop the crawl after the current page").clicked() {
+                if let Some(c) = &state.cancel {
+                    c.store(true, std::sync::atomic::Ordering::Relaxed);
+                }
+                state.last_message = "Cancelling…".into();
             }
         });
     }
@@ -169,17 +175,20 @@ pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store) {
             });
     });
 
-    // Drain channel — receive any progress events that haven't been
-    // processed by the app-level drain (which handles Done/toast).
+    // Drain channel — flip the running flag when worker signals completion.
+    // The actual UI updates (counters, toasts) happen in the app-level drain.
     if let Some(rx) = &state.rx {
-        let mut done = false;
+        let mut finished = false;
         while let Ok(ev) = rx.try_recv() {
             match ev {
-                ProgressEvent::Done => { done = true; }
+                ProgressEvent::Done | ProgressEvent::Cancelled => { finished = true; }
                 _ => { /* handled in app.rs */ }
             }
         }
-        if done { state.running = false; }
+        if finished {
+            state.running = false;
+            state.cancel = None;
+        }
     }
 }
 
@@ -193,10 +202,11 @@ fn start_crawl(state: &mut CrawlState, store: &Store) {
     state.started_at = Some(Instant::now());
     state.error = None;
     state.log.clear();
+    state.last_message = String::new();
 
     let (tx, rx) = std::sync::mpsc::channel();
     state.rx = Some(rx);
-    state.tx = Some(tx.clone());
+    state.cancel = Some(Arc::new(AtomicBool::new(false)));
 
     let wiki_url = state.wiki_url.trim().to_string();
     let seeds = state.selected_seeds();
@@ -204,6 +214,7 @@ fn start_crawl(state: &mut CrawlState, store: &Store) {
     let use_cache = state.use_cache;
     let include_subpages = state.include_subpages;
     let start_uid = store.max_uid().unwrap_or(0) + 1;
+    let cancel = state.cancel.clone().unwrap();
 
     let cache_dir = CrawlState::cache_dir();
     let _ = std::fs::create_dir_all(&cache_dir);
@@ -265,6 +276,7 @@ fn start_crawl(state: &mut CrawlState, store: &Store) {
             };
             if !use_cache { crawler.skip_cache = true; }
             crawler.include_subpages = include_subpages;
+            crawler.cancel = cancel;
             let tx2 = tx.clone();
             crawler.set_progress_callback(move |e| {
                 let _ = tx2.send(e);

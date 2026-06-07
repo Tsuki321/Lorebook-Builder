@@ -73,14 +73,20 @@ pub fn draw(ui: &mut Ui, entries: &mut Vec<WorldInfoEntry>, selected: &mut Optio
                     }
                     let _ = ui.add_sized([60.0, 22.0], egui::Checkbox::new(&mut e.selective, ""));
                     let _ = ui.add_sized([60.0, 22.0], egui::Checkbox::new(&mut e.constant, ""));
-                    let mut preview: String = e.content.chars().take(120).collect();
-                    if e.content.chars().count() > 120 { preview.push('…'); }
+                    let preview: String = e.content.chars().take(120).collect();
+                    let preview_widget = if preview.is_empty() {
+                        egui::Label::new(RichText::new("(no content)").italics().weak().size(12.0))
+                    } else {
+                        let p = if e.content.chars().count() > 120 {
+                            format!("{preview}…")
+                        } else {
+                            preview
+                        };
+                        egui::Label::new(RichText::new(p).size(12.0)).truncate()
+                    };
                     let r = ui.add_sized(
                         [ui.available_width() - 8.0, 22.0],
-                        TextEdit::singleline(&mut preview)
-                            .clip_text(true)
-                            .hint_text("(double-click row to edit content)")
-                            .font(egui::FontId::proportional(12.0)),
+                        preview_widget,
                     );
                     if r.double_clicked() {
                         content_editor = Some((e.uid, e.content.clone()));

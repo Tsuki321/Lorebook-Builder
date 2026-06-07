@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -31,6 +33,7 @@ pub struct Crawler<'a> {
     pub visited_categories: HashSet<String>,
     pub visited_pages: HashSet<u64>,
     pub progress: Option<Box<dyn Fn(ProgressEvent) + Send + Sync>>,
+    pub cancel: Arc<AtomicBool>,
 }
 
 #[derive(Debug, Clone)]
@@ -39,6 +42,7 @@ pub enum ProgressEvent {
     PageFetched { title: String, pageid: u64, cached: bool },
     PageFailed { title: String, error: String },
     EntryBuilt { uid: u64, name: String, category: String },
+    Cancelled,
     Done,
 }
 
@@ -54,6 +58,7 @@ impl<'a> Crawler<'a> {
             visited_categories: HashSet::new(),
             visited_pages: HashSet::new(),
             progress: None,
+            cancel: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -61,16 +66,29 @@ impl<'a> Crawler<'a> {
         self.progress = Some(Box::new(f));
     }
 
+    pub fn cancel_token(&self) -> Arc<AtomicBool> {
+        self.cancel.clone()
+    }
+
     /// Run the crawl. Returns all newly-fetched pages.
     pub async fn run(&mut self) -> Result<Vec<PageData>> {
         let mut out = Vec::new();
         for seed in self.seeds.clone() {
+            if self.cancel.load(Ordering::Relaxed) { break; }
             self.walk_category(&seed, &mut out).await?;
+        }
+        if self.cancel.load(Ordering::Relaxed) {
+            if let Some(p) = &self.progress { p(ProgressEvent::Cancelled); }
+            return Ok(out);
         }
         if let Some(p) = &self.progress {
             p(ProgressEvent::Done);
         }
         Ok(out)
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancel.load(Ordering::Relaxed)
     }
 
     fn report(&self, e: ProgressEvent) {
@@ -82,13 +100,16 @@ impl<'a> Crawler<'a> {
         title: &str,
         out: &mut Vec<PageData>,
     ) -> Result<()> {
+        if self.is_cancelled() { return Ok(()); }
         if !self.visited_categories.insert(title.to_string()) { return Ok(()); }
         let (subcats, pages) = self.list_category_members(title).await?;
         self.report(ProgressEvent::CategoryEntered { title: title.to_string(), total_in: pages.len() });
         for s in subcats {
+            if self.is_cancelled() { return Ok(()); }
             Box::pin(self.walk_category(&s, out)).await?;
         }
         for p_title in pages {
+            if self.is_cancelled() { return Ok(()); }
             match self.fetch_page(&p_title).await {
                 Ok(Some(page)) => {
                     if self.visited_pages.insert(page.pageid) {

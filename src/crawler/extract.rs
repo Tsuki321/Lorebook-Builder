@@ -45,34 +45,40 @@ pub fn classify(page: &PageData) -> PageKind {
     let cats = page.categories.iter()
         .map(|s| s.to_ascii_lowercase())
         .collect::<Vec<_>>();
-    let cats_str = cats.join(" ");
 
-    if cats_str.contains("pathway") || page.wikitext.contains("Pathway_template") {
+    if cats.iter().any(|c| c.contains("pathway")) || page.wikitext.contains("Pathway_template") {
         return PageKind::Pathway;
     }
-    if cats_str.contains("sealed_artifact") || cats_str.contains("mystical_item")
-        || cats_str.contains("item")
-        || contains_template(&page.wikitext, ITEM_TEMPLATES) {
+    if cats.iter().any(|c|
+           c.contains("sealed_artifact")
+        || c.contains("mystical_item")
+        || c == "item"
+        || c == "items"
+        || c.starts_with("item ")
+        || c.starts_with("items ")
+        || c.ends_with(" item")
+        || c.ends_with(" items")
+    ) || contains_template(&page.wikitext, ITEM_TEMPLATES) {
         return PageKind::Item;
     }
-    if cats_str.contains("characters") || cats_str.contains("beyonder")
+    if cats.iter().any(|c| c.contains("characters") || c.contains("beyonder"))
         || contains_template(&page.wikitext, CHARACTER_TEMPLATES) {
         return PageKind::Character;
     }
-    if cats_str.contains("location") || cats_str.contains("cities")
-        || cats_str.contains("countries") || cats_str.contains("continent")
-        || cats_str.contains("realms")
-        || contains_template(&page.wikitext, LOCATION_TEMPLATES) {
+    if cats.iter().any(|c|
+           c.contains("location") || c.contains("cities")
+        || c.contains("countries") || c.contains("continent")
+        || c.contains("realms")
+    ) || contains_template(&page.wikitext, LOCATION_TEMPLATES) {
         return PageKind::Location;
     }
-    if cats_str.contains("organization") || cats_str.contains("organisations")
-        || cats_str.contains("churches") {
+    if cats.iter().any(|c| c.contains("organization") || c.contains("organisations") || c.contains("churches")) {
         return PageKind::Organization;
     }
-    if cats_str.contains("event") || cats_str.contains("battle") {
+    if cats.iter().any(|c| c.contains("event") || c.contains("battle")) {
         return PageKind::Event;
     }
-    if cats_str.contains("terminology") {
+    if cats.iter().any(|c| c.contains("terminology")) {
         return PageKind::Terminology;
     }
     PageKind::Unknown

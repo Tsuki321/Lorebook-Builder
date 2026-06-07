@@ -31,11 +31,8 @@ impl LibraryState {
     }
 
     pub fn reload(&mut self, store: &Store) {
-        match store.list_all() {
-            Ok(raw) => match store.hydrate_all(raw) {
-                Ok(entries) => { self.entries = entries; self.error = None; }
-                Err(e) => { self.error = Some(format!("hydrate: {e:#}")); }
-            }
+        match store.list_all_with_keys() {
+            Ok(entries) => { self.entries = entries; self.error = None; }
             Err(e) => { self.error = Some(format!("load: {e:#}")); }
         }
     }

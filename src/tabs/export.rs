@@ -52,12 +52,19 @@ pub fn draw(ui: &mut Ui, state: &mut ExportState, store: &Store) {
 
     ui.horizontal(|ui| {
         ui.label(RichText::new("Output file:").strong());
-        ui.add_sized(
+        let mut path_str = state.output_path.to_string_lossy().to_string();
+        if ui.add_sized(
             [ui.available_width() - 90.0, 24.0],
-            TextEdit::singleline(&mut state.output_path.to_string_lossy().to_string())
-                .font(egui::FontId::proportional(13.0)),
-        );
-        if ui.button("📁").clicked() {
+            TextEdit::singleline(&mut path_str)
+                .font(egui::FontId::proportional(13.0))
+                .hint_text("C:\\path\\to\\lorebook.json"),
+        ).changed() {
+            let trimmed = path_str.trim();
+            if !trimmed.is_empty() {
+                state.output_path = PathBuf::from(trimmed);
+            }
+        }
+        if ui.button("📁  Browse…").on_hover_text("Pick a save location").clicked() {
             if let Some(p) = rfd::FileDialog::new()
                 .add_filter("JSON", &["json"])
                 .set_file_name(state.output_path.file_name().and_then(|s| s.to_str()).unwrap_or("lorebook.json"))
@@ -125,8 +132,7 @@ fn build_world_info(state: &ExportState, store: &Store) -> anyhow::Result<WorldI
     wb.token_budget = state.token_budget;
     wb.recursive_scanning = state.recursive_scanning;
 
-    let raw = store.list_all()?;
-    let entries = store.hydrate_all(raw)?;
+    let entries = store.list_all_with_keys()?;
     for mut e in entries {
         // Apply defaults where the user left them at their default
         if e.priority == 0 { e.priority = state.default_priority; }
