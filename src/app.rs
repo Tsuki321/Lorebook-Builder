@@ -178,38 +178,46 @@ impl eframe::App for App {
             });
 
         // Drain crawl channel (toast any failed page)
-        if let Some(rx) = &self.crawl_state.rx {
-            while let Ok(ev) = rx.try_recv() {
-                match ev {
-                    ProgressEvent::Done => {
-                        self.refresh_entries_count();
-                        self.toast = Some((Color32::from_rgb(60, 180, 100), "Crawl complete.".into()));
-                        self.toast_until = Some(std::time::Instant::now() + std::time::Duration::from_secs(4));
+        loop {
+            let ev = {
+                if let Some(rx) = &self.crawl_state.rx {
+                    match rx.try_recv() {
+                        Ok(e) => e,
+                        Err(_) => break,
                     }
-                    ProgressEvent::PageFetched { title, cached, .. } => {
-                        if cached {
-                            self.crawl_state.cached += 1;
-                        } else {
-                            self.crawl_state.ok += 1;
-                        }
-                        self.crawl_state.log.push((now_hms_c(), format!("Fetched {title}")));
+                } else {
+                    break;
+                }
+            };
+            match ev {
+                ProgressEvent::Done => {
+                    self.refresh_entries_count();
+                    self.toast = Some((Color32::from_rgb(60, 180, 100), "Crawl complete.".into()));
+                    self.toast_until = Some(std::time::Instant::now() + std::time::Duration::from_secs(4));
+                }
+                ProgressEvent::PageFetched { title, cached, .. } => {
+                    if cached {
+                        self.crawl_state.cached += 1;
+                    } else {
+                        self.crawl_state.ok += 1;
                     }
-                    ProgressEvent::CategoryEntered { title, total_in } => {
-                        self.crawl_state.total_in = self.crawl_state.total_in.saturating_add(total_in as u64);
-                        self.crawl_state.log.push((now_hms_c(), format!("→ Category {title} ({total_in} pages)")));
-                    }
-                    ProgressEvent::EntryBuilt { name, .. } => {
-                        self.crawl_state.entries_built += 1;
-                        self.crawl_state.log.push((now_hms_c(), format!("Stored entry: {name}")));
-                        self.refresh_entries_count();
-                    }
-                    ProgressEvent::PageFailed { title, error } => {
-                        self.crawl_state.err += 1;
-                        self.crawl_state.log.push((now_hms_c(), format!("FAIL {title}: {error}")));
-                        if error.contains("tokio") || error.contains("init") {
-                            self.toast = Some((Color32::from_rgb(200, 80, 80), format!("Crawl error: {error}")));
-                            self.toast_until = Some(std::time::Instant::now() + std::time::Duration::from_secs(6));
-                        }
+                    self.crawl_state.log.push((now_hms_c(), format!("Fetched {title}")));
+                }
+                ProgressEvent::CategoryEntered { title, total_in } => {
+                    self.crawl_state.total_in = self.crawl_state.total_in.saturating_add(total_in as u64);
+                    self.crawl_state.log.push((now_hms_c(), format!("→ Category {title} ({total_in} pages)")));
+                }
+                ProgressEvent::EntryBuilt { name, .. } => {
+                    self.crawl_state.entries_built += 1;
+                    self.crawl_state.log.push((now_hms_c(), format!("Stored entry: {name}")));
+                    self.refresh_entries_count();
+                }
+                ProgressEvent::PageFailed { title, error } => {
+                    self.crawl_state.err += 1;
+                    self.crawl_state.log.push((now_hms_c(), format!("FAIL {title}: {error}")));
+                    if error.contains("tokio") || error.contains("init") {
+                        self.toast = Some((Color32::from_rgb(200, 80, 80), format!("Crawl error: {error}")));
+                        self.toast_until = Some(std::time::Instant::now() + std::time::Duration::from_secs(6));
                     }
                 }
             }
