@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use eframe::egui::{self, Align2, Color32, Context, FontId, RichText, Sense, Stroke, Vec2};
+use eframe::egui::{self, Align2, Color32, Context, FontId, Sense, Stroke, StrokeKind, Vec2};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToastKind {
@@ -122,7 +122,7 @@ pub fn render(ctx: &Context, queue: &ToastQueue) {
         let rect = egui::Rect::from_min_size(pos, Vec2::new(toast_w, toast_h));
 
         egui::Area::new(egui::Id::new(("toast", i, t.created.elapsed().as_millis())))
-            .anchor(Align2::LEFT_TOP)
+            .anchor(Align2::LEFT_TOP, Vec2::ZERO)
             .fixed_pos(pos)
             .interactable(false)
             .order(egui::Order::Foreground)
@@ -131,7 +131,7 @@ pub fn render(ctx: &Context, queue: &ToastQueue) {
                 let resp = ui.allocate_rect(egui::Rect::from_min_size(ui.next_widget_position(), Vec2::new(toast_w, toast_h)), sense);
 
                 ui.painter().rect_filled(rect, 6.0, fill);
-                ui.painter().rect_stroke(rect, 6.0, Stroke::new(1.0, stroke_color));
+                ui.painter().rect_stroke(rect, 6.0, Stroke::new(1.0, stroke_color), StrokeKind::Inside);
 
                 // accent bar on the left
                 let bar = egui::Rect::from_min_size(pos, Vec2::new(4.0, toast_h));
@@ -143,24 +143,14 @@ pub fn render(ctx: &Context, queue: &ToastQueue) {
 
                 // message text
                 let text_pos = pos + Vec2::new(36.0, 10.0);
-                let galley = ui.painter().layout_no_wrap(
+                let max_text_w = toast_w - 48.0;
+                let galley = ui.painter().layout(
                     t.message.clone(),
                     FontId::proportional(13.0),
                     text_color,
+                    max_text_w,
                 );
-                let max_text_w = toast_w - 48.0;
-                let clipped = if galley.size().x > max_text_w {
-                    let (s, _) = ui.painter().layout(
-                        t.message.clone(),
-                        FontId::proportional(13.0),
-                        text_color,
-                        max_text_w,
-                    );
-                    s
-                } else {
-                    galley
-                };
-                ui.painter().galley(text_pos, clipped, text_color);
+                ui.painter().galley(text_pos, galley, text_color);
 
                 // close button if hovered
                 if resp.hovered() {

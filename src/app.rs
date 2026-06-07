@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use eframe::egui::{self, Color32, Context, RichText, TopBottomPanel};
+use eframe::egui::{self, Context, RichText, TopBottomPanel};
 use parking_lot::Mutex;
 
 use crate::crawler::ProgressEvent;
@@ -84,7 +84,7 @@ impl eframe::App for App {
                     ui.add_space(8.0);
                     ui.label(format!("{} entries", self.entries_count_cache));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        egui::ComboBox::from_id_source("theme-picker")
+                        egui::ComboBox::from_id_salt("theme-picker")
                             .selected_text(self.theme.display())
                             .show_ui(ui, |ui| {
                                 for t in ThemeChoice::all() {
