@@ -9,6 +9,7 @@ use eframe::egui::{self, Color32, RichText, TextEdit, Ui};
 
 use crate::crawler::{ApiClient, Crawler, PageData, ProgressEvent};
 use crate::model::Store;
+use crate::ui::toast::ToastQueue;
 use crate::ui::widgets;
 
 #[derive(Default)]
@@ -85,7 +86,7 @@ impl CrawlState {
     }
 }
 
-pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store) {
+pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store, _toasts: &mut ToastQueue) {
     widgets::section_header(ui, "Crawl", Some("Pull a Fandom/MediaWiki wiki into your library."));
 
     ui.horizontal(|ui| {

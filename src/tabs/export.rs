@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 
-use eframe::egui::{self, Color32, RichText, TextEdit, Ui};
+use eframe::egui::{self, RichText, TextEdit, Ui};
 
 use crate::export;
 use crate::model::{Store, WorldInfo};
+use crate::ui::toast::ToastQueue;
 use crate::ui::widgets;
 
 pub struct ExportState {
@@ -18,7 +19,6 @@ pub struct ExportState {
     pub default_depth: u32,
     pub default_selective: bool,
     pub default_constant: bool,
-    pub message: Option<(Color32, String)>,
 }
 
 impl ExportState {
@@ -38,12 +38,11 @@ impl ExportState {
             default_depth: 4,
             default_selective: true,
             default_constant: false,
-            message: None,
         }
     }
 }
 
-pub fn draw(ui: &mut Ui, state: &mut ExportState, store: &Store) {
+pub fn draw(ui: &mut Ui, state: &mut ExportState, store: &Store, toasts: &mut ToastQueue) {
     widgets::section_header(
         ui,
         "Export",
@@ -98,29 +97,27 @@ pub fn draw(ui: &mut Ui, state: &mut ExportState, store: &Store) {
 
     ui.add_space(8.0);
     if ui.add_sized([220.0, 32.0], egui::Button::new(RichText::new("💾  Export SillyTavern JSON").strong())).clicked() {
-        do_export(state, store);
-    }
-
-    if let Some((color, msg)) = &state.message {
-        ui.add_space(6.0);
-        ui.colored_label(*color, msg);
+        do_export(state, store, toasts);
     }
 }
 
-fn do_export(state: &mut ExportState, store: &Store) {
+fn do_export(state: &mut ExportState, store: &Store, toasts: &mut ToastQueue) {
     match build_world_info(state, store) {
         Ok(wb) => {
-            let s = export::to_string_pretty(&wb);
-            if let Err(e) = std::fs::write(&state.output_path, s) {
-                state.message = Some((Color32::from_rgb(255, 100, 100), format!("❌ write failed: {e}")));
-                return;
-            }
             let n = wb.entries.len();
-            state.message = Some((Color32::from_rgb(100, 200, 100),
-                format!("✅ Exported {n} entries to {}", state.output_path.display())));
+            let path_display = state.output_path.display().to_string();
+            let s = export::to_string_pretty(&wb);
+            match std::fs::write(&state.output_path, s) {
+                Ok(()) => {
+                    toasts.success(format!("Exported {n} entries to {path_display}"));
+                }
+                Err(e) => {
+                    toasts.error(format!("Write failed: {e}"));
+                }
+            }
         }
         Err(e) => {
-            state.message = Some((Color32::from_rgb(255, 100, 100), format!("❌ build failed: {e:#}")));
+            toasts.error(format!("Build failed: {e:#}"));
         }
     }
 }

@@ -7,6 +7,7 @@ use crate::crawler::ProgressEvent;
 use crate::model::Store;
 use crate::tabs;
 use crate::theme::{self, ThemeChoice};
+use crate::ui::toast::{self, ToastQueue};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tab {
@@ -39,8 +40,7 @@ pub struct App {
     pub crawl_state: tabs::crawl::CrawlState,
     pub library_state: tabs::library::LibraryState,
     pub export_state: tabs::export::ExportState,
-    pub toast: Option<(Color32, String)>,
-    pub toast_until: Option<std::time::Instant>,
+    pub toasts: ToastQueue,
     pub entries_count_cache: u64,
 }
 
@@ -55,8 +55,7 @@ impl App {
             crawl_state: tabs::crawl::CrawlState::new(),
             library_state: lib,
             export_state: tabs::export::ExportState::new(),
-            toast: None,
-            toast_until: None,
+            toasts: ToastQueue::new(),
             entries_count_cache: 0,
         };
         s.refresh_entries_count();
@@ -162,13 +161,13 @@ impl eframe::App for App {
                 let store = self.store.lock();
                 match self.active_tab {
                     Tab::Crawl => {
-                        let _ = tabs::crawl::draw(ui, &mut self.crawl_state, &store);
+                        let _ = tabs::crawl::draw(ui, &mut self.crawl_state, &store, &mut self.toasts);
                     }
                     Tab::Library => {
                         tabs::library::draw(ui, &mut self.library_state, &store);
                     }
                     Tab::Export => {
-                        tabs::export::draw(ui, &mut self.export_state, &store);
+                        tabs::export::draw(ui, &mut self.export_state, &store, &mut self.toasts);
                     }
                 }
                 drop(store);
@@ -192,12 +191,15 @@ impl eframe::App for App {
             match ev {
                 ProgressEvent::Done => {
                     self.refresh_entries_count();
-                    self.toast = Some((Color32::from_rgb(60, 180, 100), "Crawl complete.".into()));
-                    self.toast_until = Some(std::time::Instant::now() + std::time::Duration::from_secs(4));
+                    self.toasts.success(format!(
+                        "Crawl complete — {} entries, {} errors",
+                        self.crawl_state.entries_built, self.crawl_state.err
+                    ));
                 }
                 ProgressEvent::Cancelled => {
                     self.refresh_entries_count();
                     self.crawl_state.last_message = "Cancelled.".into();
+                    self.toasts.warn("Crawl cancelled.");
                 }
                 ProgressEvent::PageFetched { title, cached, .. } => {
                     if cached {
@@ -220,9 +222,14 @@ impl eframe::App for App {
                     self.crawl_state.err += 1;
                     self.crawl_state.log.push((now_hms_c(), format!("FAIL {title}: {error}")));
                     self.crawl_state.last_message = format!("Error: {title}");
+                    self.toasts.error(format!("{title}: {error}"));
                 }
             }
         }
+
+        // Render floating toasts
+        self.toasts.tick();
+        toast::render(ctx, &self.toasts);
 
         // Keyboard shortcuts
         if ctx.input(|i| i.key_pressed(egui::Key::Num1) && i.modifiers.command) { self.active_tab = Tab::Crawl; }
