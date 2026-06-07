@@ -119,7 +119,7 @@ pub fn draw(ui: &mut Ui, state: &mut LibraryState, store: &Store) {
         }
         ViewMode::SideEdit => {
             ui.horizontal(|ui| {
-                ui.allocate_ui([280.0, ui.available_height()], |ui| {
+                ui.allocate_ui(egui::vec2(280.0, ui.available_height()), |ui| {
                     egui::ScrollArea::vertical().show(ui, |ui| {
                         for e in state.entries.iter() {
                             let label = format!("{}{}",

@@ -165,8 +165,7 @@ impl Store {
 
     pub fn max_uid(&self) -> Result<u64> {
         let v: Option<i64> = self.conn
-            .query_row("SELECT MAX(uid) FROM entries", [], |r| r.get(0))
-            .unwrap_or(Some(None).transpose().unwrap_or(None));
+            .query_row("SELECT MAX(uid) FROM entries", [], |r| r.get(0))?;
         Ok(v.unwrap_or(0).max(0) as u64)
     }
 

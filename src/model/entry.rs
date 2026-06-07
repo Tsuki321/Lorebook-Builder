@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Field names are deliberately identical to the on-disk format used by
 /// SillyTavern, including the `key` / `keys` / `keysecondary` / `secondary_keys`
 /// duplication that ST itself writes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct WorldInfoEntry {
     pub uid: u64,
     pub key: Vec<String>,
@@ -44,7 +44,7 @@ pub struct WorldInfoEntry {
     pub character_filter: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EntryExtensions {
     pub depth: u32,
     pub weight: u32,

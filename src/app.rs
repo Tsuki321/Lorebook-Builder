@@ -94,6 +94,7 @@ impl eframe::App for App {
                                         theme::apply(ctx, t);
                                     }
                                 }
+                                None::<()>
                             });
                     });
                 });
@@ -113,7 +114,8 @@ impl eframe::App for App {
                     if self.crawl_state.running {
                         ui.label(RichText::new(format!("OK {} / Err {} / Cached {}",
                             self.crawl_state.ok, self.crawl_state.err, self.crawl_state.cached)).size(12.0).weak());
-                    } else if let Some(msg) = &self.crawl_state.last_message {
+                    } else if !self.crawl_state.last_message.is_empty() {
+                        let msg = &self.crawl_state.last_message;
                         ui.label(RichText::new(msg).size(12.0).weak());
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -157,24 +159,6 @@ impl eframe::App for App {
                 .fill(ctx.style().visuals.faint_bg_color)
                 .inner_margin(egui::Margin::same(14)))
             .show(ctx, |ui| {
-                // Toast overlay
-                if let Some(deadline) = self.toast_until {
-                    if std::time::Instant::now() > deadline { self.toast = None; }
-                }
-                if let Some((color, msg)) = &self.toast {
-                    egui::Area::new("toast".into())
-                        .anchor(egui::Align2::RIGHT_BOTTOM, [-16.0, -16.0])
-                        .show(ctx, |ui| {
-                            let frame = egui::Frame::new()
-                                .fill(*color)
-                                .corner_radius(egui::CornerRadius::same(8))
-                                .inner_margin(egui::Margin::symmetric(14, 10));
-                            frame.show(ctx, |ui| {
-                                ui.label(RichText::new(msg).color(Color32::WHITE).strong());
-                            });
-                        });
-                }
-
                 let store = self.store.lock();
                 match self.active_tab {
                     Tab::Crawl => {

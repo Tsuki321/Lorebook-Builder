@@ -151,7 +151,7 @@ impl<'a> Crawler<'a> {
     }
 
     /// Fetch a single page's wikitext + categories, using the disk cache.
-    pub async fn fetch_page(&self, title: &str) -> Result<Option<PageData>> {
+    pub async fn fetch_page(&mut self, title: &str) -> Result<Option<PageData>> {
         if !self.skip_cache {
             if let Some(c) = self.cache.get(title)? {
                 self.report(ProgressEvent::PageFetched {
