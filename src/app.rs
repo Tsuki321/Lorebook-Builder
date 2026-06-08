@@ -28,9 +28,9 @@ impl Tab {
     }
     pub fn icon(self) -> &'static str {
         match self {
-            Tab::Crawl => "🜲",
-            Tab::Library => "🕮",
-            Tab::Export => "⇪",
+            Tab::Crawl => "crawl",
+            Tab::Library => "library",
+            Tab::Export => "export",
         }
     }
 }

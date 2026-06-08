@@ -1,7 +1,9 @@
-use eframe::egui::{self, Color32, RichText, Sense, Ui, Vec2};
+use eframe::egui::{self, Color32, Rect, RichText, Sense, Ui, Vec2};
+
+use super::tab_icons;
 
 /// A sidebar tab button that lights up when active.
-pub fn sidebar_button(ui: &mut Ui, label: &str, icon: &str, active: bool, badge: Option<String>) -> bool {
+pub fn sidebar_button(ui: &mut Ui, label: &str, icon_key: &str, active: bool, badge: Option<String>) -> bool {
     let desired = Vec2::new(ui.available_width(), 38.0);
     let (rect, resp) = ui.allocate_exact_size(desired, Sense::click());
     let visuals = &ui.style().visuals;
@@ -15,17 +17,26 @@ pub fn sidebar_button(ui: &mut Ui, label: &str, icon: &str, active: bool, badge:
     ui.painter().rect_filled(rect, egui::CornerRadius::same(6), bg);
     let text_color = if active { visuals.strong_text_color() } else { visuals.text_color() };
     let badge_color = visuals.hyperlink_color;
-    // Painter's `text` doesn't have a "strong" variant, so we emulate
-    // emphasis on the active tab by darkening the color slightly and
-    // bumping the size by 0.5pt instead.
     let font = egui::FontId::proportional(14.0);
+
+    // Icon: 18x18 box, vertically centered, 12px from the left edge
+    let icon_size = 18.0_f32;
+    let icon_rect = Rect::from_center_size(
+        egui::pos2(rect.left() + 12.0 + icon_size * 0.5, rect.center().y),
+        Vec2::new(icon_size, icon_size),
+    );
+    tab_icons::draw_in_rect(ui.painter(), icon_key, icon_rect, text_color);
+
+    // Text starts after the icon with a small gap
+    let text_x = icon_rect.right() + 8.0;
     ui.painter().text(
-        rect.left_center() + Vec2::new(14.0, 0.0),
+        egui::pos2(text_x, rect.center().y),
         egui::Align2::LEFT_CENTER,
-        format!("{icon}  {label}"),
+        label,
         font,
         text_color,
     );
+
     if let Some(b) = badge {
         let w = b.chars().count() as f32 * 7.0 + 16.0;
         let badge_rect = egui::Rect::from_min_size(
