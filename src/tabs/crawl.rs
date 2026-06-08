@@ -96,9 +96,13 @@ pub fn draw(ui: &mut Ui, state: &mut CrawlState, store: &Store, _toasts: &mut To
     ui.label(RichText::new("Seed categories:").strong());
     ui.horizontal_wrapped(|ui| {
         for c in state.categories.iter_mut() {
+            // Icon (allocated separately so it aligns with the checkbox text)
+            crate::ui::category_icons::draw(ui, &c.name);
+            ui.add_space(2.0);
             if ui.checkbox(&mut c.enabled, &c.name).changed() {
                 *dirty = true;
             }
+            ui.add_space(10.0);
         }
     });
 
